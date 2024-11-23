@@ -1,7 +1,6 @@
 package cmd;
-
+//Ultimate Battle Editor v1.1 - Mission 100
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -15,25 +14,25 @@ public class Mission100
 	static final String OPP_CFG_HEADER =
 	"chara-id,costume-num,com-diff-lvl,item-id-1,item-id-2,item-id-3,item-id-4,item-id-5,item-id-6,item-id-7,item-id-8\n";
 	static RandomAccessFile battleConfigData, oppConfigData;
-	public static void readBattleConfigFile() throws FileNotFoundException, IOException
+	public static void readBattleConfigFile() throws IOException
 	{
 		battleConfigData = new RandomAccessFile(Main.RES_PATH+Main.MODE_SELECT[1]+"/09_ub_mission_param.dat","r");
 		long fileSize = battleConfigData.length();
 		if (fileSize!=5248) //prevent EOFException
 		{
 			battleConfigData.close(); return; 
-		}	
+		}
 		String input=Mission100.BATTLE_CFG_HEADER;
 		for (int i=0; i<5200; i+=4)
 		{
 			if (i%52==0) 
 			{
-				System.out.println("Reading mission "+((i/52)+1)+"'s battle parameters...");
 				if (i!=0)
 				{	
 					input+="\n"; //end of row
 					input = input.substring(0, input.length()-2)+"\n";
 				}
+				Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 			}
 			int val = LittleEndian.getInt(battleConfigData.readInt());
 			input+=val+",";
@@ -43,7 +42,7 @@ public class Mission100
 		writer.write(input); 
 		writer.close(); battleConfigData.close();
 	}
-	public static void readOpponentConfigFile() throws FileNotFoundException, IOException
+	public static void readOpponentConfigFile() throws IOException
 	{
 		oppConfigData = new RandomAccessFile(Main.RES_PATH+Main.MODE_SELECT[1]+"/10_ub_mission_opponent_param.dat","r");
 		long fileSize = oppConfigData.length();
@@ -63,7 +62,6 @@ public class Mission100
 				}
 				if (i%220==0)
 				{
-					System.out.println("Reading mission "+(i/220)+"'s opponent parameters...");
 					int fileCntDigits=3, currentDigits=Main.getNumberOfDigits(i/220);
 					int numberOfZeroes = fileCntDigits-currentDigits;
 					String fileName = Main.RES_PATH+Main.MODE_SELECT[1]+"/m100-opp-cfg-";
@@ -73,6 +71,7 @@ public class Mission100
 					FileWriter writer = new FileWriter(new File(fileName+(i/220)+".csv"));
 					writer.write(input); writer.close();
 					input=OPP_CFG_HEADER; //reset row
+					Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 				}
 			}
 			int val = LittleEndian.getInt(oppConfigData.readInt());
@@ -80,7 +79,7 @@ public class Mission100
 		}
 		oppConfigData.close();
 	}
-	public static void writeBattleConfigFile(int missionID) throws FileNotFoundException, IOException
+	public static void writeBattleConfigFile(int missionID) throws IOException
 	{
 		String root = Main.RES_PATH+Main.MODE_SELECT[1]+"/";
 		int lineCnt=0, missionAddr=(missionID-1)*52, pos;
@@ -104,7 +103,6 @@ public class Mission100
 			if (!Main.isSingleMission) missionID=lineCnt; //this will assure the 2nd if condition is ALWAYS TRUE
 			if (lineCnt==missionID)
 			{
-				System.out.println("Overwriting mission "+missionID+"'s battle parameters...");
 				for (String i: inputArr)
 				{
 					int newInt = Integer.parseInt(i);
@@ -114,11 +112,12 @@ public class Mission100
 					if (currInt!=newInt) battleConfigData.writeInt(LittleEndian.getInt(newInt));
 					pos+=4;
 				}
+				Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 			}
 		}
 		sc.close();
 	}
-	public static void writeOpponentConfigFile(int missionID) throws FileNotFoundException, IOException
+	public static void writeOpponentConfigFile(int missionID) throws IOException
 	{
 		String root = Main.RES_PATH+Main.MODE_SELECT[1]+"/";
 		File folder = new File(root), selectedCSV=null;
@@ -154,9 +153,7 @@ public class Mission100
 				sc = new Scanner(selectedCSV);
 			}
 			sc.nextLine(); //skip header
-
-			if (!Main.isSingleMission) System.out.println("Overwriting mission "+(i+1)+"'s opponent parameters...");
-			else System.out.println("Overwriting mission "+missionID+"'s opponent parameters...");
+			Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 			
 			while (sc.hasNextLine())
 			{

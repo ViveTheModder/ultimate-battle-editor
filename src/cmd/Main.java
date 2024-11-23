@@ -1,8 +1,11 @@
 package cmd;
-//Ultimate Battle Editor v1.0 by ViveTheModder
+//Ultimate Battle Editor v1.1 - GUI
 import java.awt.Color;
 import java.awt.Desktop;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -17,31 +20,40 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.SwingConstants;
+import javax.swing.SwingWorker;
+import javax.swing.UIManager;
+import javax.swing.WindowConstants;
 
 public class Main 
 {
-	static final Image ICON = Toolkit.getDefaultToolkit().getImage(ClassLoader.getSystemResource("img/icon.png"));
+	private static final Image ICON = Toolkit.getDefaultToolkit().getImage(ClassLoader.getSystemResource("img/icon.png"));
 	static final int[] MODE_MAX_MISSIONS = {7,100,3,99,5};
-	static final String HTML_TEXT = "<html><div style='font-family: Tahoma, Geneva, sans-serif; font-size: 14px; color: white;'>";
-	static final String HTML_TEXT_BLACK = HTML_TEXT.replace("white", "black");
-	static final String HTML_TEXT_GOLD = HTML_TEXT.replace("white", "#e4ca02");
+	private static final int BG_RGB = 0x323B52;
+	private static final String HTML_TEXT = "<html><div style='font-family: Tahoma, Geneva, sans-serif; font-size: 14px; color: white;'>";
+	private static final String HTML_TEXT_BLACK = HTML_TEXT.replace("white", "black");
+	private static final String HTML_TEXT_GOLD = HTML_TEXT.replace("white", "#e4ca02");
 	static final String RES_PATH = "./res/";
-	static final String WINDOW_TITLE = "Ultimate Battle Editor";
-	static final String[] ACTION_SELECT = {"Read DAT Files","Write DAT Files","Interpret CSV Files"};
+	private static final String WINDOW_TITLE = "Ultimate Battle Editor";
+	private static final String[] ACTION_SELECT = {"Read DAT Files","Write DAT Files","Interpret CSV Files"};
 	static final String[] MODE_SELECT = {"sim-dragon","mission-100","survival","ranking-battle","course-battle"};
     static boolean isSingleMission=true, isForWii=false;
-	static int actionSelIndex=0, missionID=1, modeSelIndex=0;
-	static JButton confBtn = new JButton(HTML_TEXT+"Confirm");
-	static JFrame frame = new JFrame(WINDOW_TITLE);
-	static JLabel label = new JLabel(HTML_TEXT+"Choose a gamemode:");
-	static JPanel panel = new JPanel();
-	static JRadioButton[] radioBtns;
+    private static int actionSelIndex=0, missionID=1, modeSelIndex=0;
+	static int fileCnt=0, fileTotal=1;
+	private static JButton confBtn = new JButton(HTML_TEXT+"Confirm");
+	static JDialog loading;
+	private static JFrame frame = new JFrame(WINDOW_TITLE);
+	private static JLabel label = new JLabel(HTML_TEXT+"Choose a gamemode:");
+	private static JPanel panel = new JPanel();
+	static JProgressBar bar;
+	private static JRadioButton[] radioBtns;
 
 	public static int getNumberOfDigits(int num)
 	{
@@ -55,7 +67,7 @@ public class Main
 	}
 	public static void setErrorLog(Exception e)
 	{
-		frame.setVisible(false);
+		loading.setVisible(false);
 		File errorLog = new File("errors.log");
 		try {
 			FileWriter logWriter = new FileWriter(errorLog,true);
@@ -65,6 +77,7 @@ public class Main
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
+		System.exit(1);
 	}
 	public static void setModeSelect()
 	{
@@ -86,7 +99,7 @@ public class Main
 				radioBtns[i].setToolTipText(HTML_TEXT_BLACK+"Disc Fusion's take on the gamemode from Budokai Tenkaichi.");
 			else if (i==0) radioBtns[0].setSelected(true);
 			
-			radioBtns[i].setBackground(new Color(0x323B52));
+			radioBtns[i].setBackground(new Color(BG_RGB));
 			radioBtns[i].setHorizontalAlignment(SwingConstants.CENTER);
 			radioBtns[i].addActionListener(new ActionListener() {
 				@Override
@@ -105,9 +118,9 @@ public class Main
 			}
 		});
 		panel.add(new JLabel(" ")); panel.add(confBtn);
-		panel.setBackground(new Color(0x323B52));
+		panel.setBackground(new Color(BG_RGB));
 		frame.add(panel);
-		frame.getContentPane().setBackground(new Color(0x323B52));
+		frame.getContentPane().setBackground(new Color(BG_RGB));
 		frame.setIconImage(ICON);
 		frame.setLayout(new GridBagLayout());	
 		frame.setSize(512, 512);
@@ -138,7 +151,7 @@ public class Main
 				+ "This action will read the DAT files for "+MODE_SELECT[modeSelIndex].replace('-', ' ').toUpperCase()
 				+ "<br>and save their information in a series of CSV files.");
 			}
-			radioBtns[i].setBackground(new Color(0x323B52));
+			radioBtns[i].setBackground(new Color(BG_RGB));
 			radioBtns[i].setHorizontalAlignment(SwingConstants.CENTER);
 			radioBtns[i].addActionListener(new ActionListener() {
 				@Override
@@ -153,140 +166,170 @@ public class Main
 		JCheckBox wiiCheck = new JCheckBox(HTML_TEXT+"Wii Mode");
 		wiiCheck.setToolTipText(HTML_TEXT_BLACK+"This option is meant for files whose integers are in Big Endian, "
 		+ "not Little Endian<br>(which is the default byte order for the PS2 version of Budokai Tenkaichi 3).");
-		wiiCheck.setBackground(new Color(0x323B52));
+		wiiCheck.setBackground(new Color(BG_RGB));
 		wiiCheck.setHorizontalAlignment(SwingConstants.CENTER);
 		
 		confBtn.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				frame.setVisible(false);
+				frame.setVisible(false); frame.dispose();
 				if (wiiCheck.isSelected()) isForWii=true;
-				try {
-					performAction();
-				} catch (IOException e1) {
-					setErrorLog(e1);
-					System.exit(1);
-				}
+				setProgress();
 			}
 		});
 		panel.add(wiiCheck);
 		panel.add(new JLabel(" "));
 		panel.add(confBtn);
 	}
-	public static void performAction() throws IOException
+	public static void setProgress()
 	{
-		if (actionSelIndex==2) 
+		//change progress bar settings (must be done before declaring)
+	    UIManager.put("ProgressBar.background", Color.WHITE);
+	    UIManager.put("ProgressBar.foreground", Color.GREEN);
+	    UIManager.put("ProgressBar.selectionBackground", Color.BLACK);
+	    UIManager.put("ProgressBar.selectionForeground", Color.BLACK);
+		//add -ing at end of action verb (felt better than making another array)
+	    String[] labelTextArr = ACTION_SELECT[actionSelIndex].split(" ");
+	    if (labelTextArr[0].endsWith("e")) //get rid of e at end of action verb if it exists
+	    	labelTextArr[0] = labelTextArr[0].substring(0, labelTextArr[0].length()-1);
+	    String labelText = labelTextArr[0]+"ing "+labelTextArr[1]+" "+labelTextArr[2]+"...";
+		loading = new JDialog();
+		JPanel panel = new JPanel();
+		JLabel label = new JLabel(HTML_TEXT_GOLD+labelText);
+		bar = new JProgressBar();
+		bar.setValue(0);
+		bar.setStringPainted(true);
+		bar.setBorderPainted(true);
+		bar.setBorder(BorderFactory.createMatteBorder(2, 2, 2, 2, Color.LIGHT_GRAY));
+		bar.setFont(new Font("Tahoma", Font.BOLD, 14));
+		bar.setMinimumSize(new Dimension(128,32));
+		bar.setMaximumSize(new Dimension(128,32));
+		bar.setPreferredSize(new Dimension(128,32));
+		label.setHorizontalAlignment(SwingConstants.CENTER);
+		panel.setBackground(new Color(BG_RGB));
+		panel.setLayout(new GridLayout(0,1));
+		panel.add(label);
+		panel.add(bar);
+		loading.add(panel);
+		loading.getContentPane().setBackground(new Color(BG_RGB));
+		loading.setTitle(WINDOW_TITLE);
+		loading.setLayout(new GridBagLayout());
+		loading.setSize(256,256);
+		loading.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+		loading.setIconImage(ICON);
+		loading.setLocationRelativeTo(null);
+		loading.setVisible(true);
+		
+		SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>()
 		{
-			DataInterpreter.interpretData(modeSelIndex);
-			JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-			"CSV files have been interpreted successfully!", WINDOW_TITLE, 1);
-			System.exit(0);
-		}
-		else
-		{
-			if (actionSelIndex==1)
-			{
-				String input = JOptionPane.showInputDialog(null, HTML_TEXT_BLACK+
-				"Enter a mission ID (or leave empty to overwrite them all):",WINDOW_TITLE, -1);
-				if (input==null) System.exit(1);
-				else if (input.matches("[0-9]+")) 
-				{
-					missionID=Integer.parseInt(input);
-					if (missionID>MODE_MAX_MISSIONS[modeSelIndex]) missionID=MODE_MAX_MISSIONS[modeSelIndex]; //handle overflow
-					if (missionID<=0) missionID=1; //handle underflow
-				}
-				else if (input.equals("")) isSingleMission=false;
+			@Override
+			protected Void doInBackground() throws Exception {
+				performAction();
+				return null;
 			}
-			switch (modeSelIndex)
+		};
+		worker.execute();
+	}
+	public static void performAction()
+	{
+		String[] actions = {"read","overwritten","interpreted"};
+		try {
+			if (actionSelIndex==2) DataInterpreter.interpretData(modeSelIndex);
+			else
 			{
-				case 0: 
 				if (actionSelIndex==1)
 				{
-					SimDragon.writeBattleConfigFile(missionID);
-					SimDragon.writeOpponentConfigFile(missionID);
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Sim Dragon's files have been overwritten successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
+					String input = JOptionPane.showInputDialog(null, HTML_TEXT_BLACK+
+					"Enter a mission ID (or leave empty to overwrite them all):",WINDOW_TITLE, -1);
+					if (input==null) System.exit(1);
+					else if (input.matches("[0-9]+")) 
+					{
+						missionID=Integer.parseInt(input);
+						if (missionID>MODE_MAX_MISSIONS[modeSelIndex]) missionID=MODE_MAX_MISSIONS[modeSelIndex]; //handle overflow
+						if (missionID<=0) missionID=1; //handle underflow
+						loading.setVisible(false); //no progress bar is needed if only one file is being worked on
+					}
+					else if (input.equals("")) isSingleMission=false;
 				}
-				else 
+				switch (modeSelIndex)
 				{
-					SimDragon.readBattleConfigFile();
-					SimDragon.readOpponentConfigFile();
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Sim Dragon's files have been read successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				} break;
-				case 1: 
-				if (actionSelIndex==1) 
-				{
-					Mission100.writeBattleConfigFile(missionID);
-					Mission100.writeOpponentConfigFile(missionID);
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Mission 100's files have been overwritten successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
+					case 0:
+					Main.fileTotal = 2*Main.MODE_MAX_MISSIONS[0];
+					Main.bar.setMaximum(Main.fileTotal);
+					if (actionSelIndex==1)
+					{
+						SimDragon.writeBattleConfigFile(missionID);
+						SimDragon.writeOpponentConfigFile(missionID);
+					}
+					else 
+					{
+						SimDragon.readBattleConfigFile();
+						SimDragon.readOpponentConfigFile();
+					} break;
+					case 1:
+					Main.fileTotal = 2*Main.MODE_MAX_MISSIONS[1];
+					Main.bar.setMaximum(Main.fileTotal);
+					if (actionSelIndex==1) 
+					{
+						Mission100.writeBattleConfigFile(missionID);
+						Mission100.writeOpponentConfigFile(missionID);
+					}
+					else
+					{
+						Mission100.readBattleConfigFile();
+						Mission100.readOpponentConfigFile();
+					} break;
+					case 2:
+					Main.fileTotal = 2*Main.MODE_MAX_MISSIONS[2];
+					Main.bar.setMaximum(Main.fileTotal);	
+					if (actionSelIndex==1)
+					{
+						Survival.writeBattleConfigFile(missionID);
+						Survival.writeOpponentConfigFile(missionID);
+					}
+					else
+					{
+						Survival.readBattleConfigFile();
+						Survival.readOpponentConfigFile();
+					} break;
+					case 3:
+					Main.fileTotal = 2*Main.MODE_MAX_MISSIONS[3]+74;
+					Main.bar.setMaximum(Main.fileTotal);
+					if (actionSelIndex==1)
+					{	
+						RankingBattle.writeBattleConfigFile(missionID);
+						RankingBattle.writeOpponentConfigFile(missionID);
+					}
+					else
+					{
+						RankingBattle.readBattleConfigFile();
+						RankingBattle.readOpponentConfigFile();
+					} break;
+					case 4:
+					Main.fileTotal = 2*Main.MODE_MAX_MISSIONS[4];
+					Main.bar.setMaximum(Main.fileTotal);
+					if (actionSelIndex==1) 
+					{
+						CourseBattle.writeBattleConfigFile(missionID);
+						CourseBattle.writeOpponentConfigFile(missionID);
+					}
+					else 
+					{
+						CourseBattle.readBattleConfigFile();
+						CourseBattle.readOpponentConfigFile();
+					} break;
 				}
-				else
-				{
-					Mission100.readBattleConfigFile();
-					Mission100.readOpponentConfigFile();
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Mission 100's files have been read successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				} break;
-				case 2:
-				if (actionSelIndex==1)
-				{
-					Survival.writeBattleConfigFile(missionID);
-					Survival.writeOpponentConfigFile(missionID);
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Survival's files have been overwritten successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				}
-				else
-				{
-					Survival.readBattleConfigFile();
-					Survival.readOpponentConfigFile();
-					frame.setVisible(false);
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Survival's files have been read successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				} break;
-				case 3: 
-				if (actionSelIndex==1)
-				{	
-					RankingBattle.writeBattleConfigFile(missionID);
-					RankingBattle.writeOpponentConfigFile(missionID);
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Ranking Battle's files have been overwritten successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				}
-				else
-				{
-					RankingBattle.readBattleConfigFile();
-					RankingBattle.readOpponentConfigFile();
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Ranking Battle's files have been read successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				} break;
-				case 4:
-				if (actionSelIndex==1) 
-				{
-					CourseBattle.writeBattleConfigFile(missionID);
-					CourseBattle.writeOpponentConfigFile(missionID);
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Course Battle's files have been overwritten successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				}
-				else 
-				{
-					CourseBattle.readBattleConfigFile();
-					CourseBattle.readOpponentConfigFile();
-					JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+
-					"Course Battle's files have been read successfully!", WINDOW_TITLE, 1);
-					System.exit(0);
-				} break;
 			}
+		} catch (IOException e) {
+			setErrorLog(e);
 		}
+		loading.setVisible(false); loading.dispose();
+		//generate message contents after action is performed
+		String fileType="DAT";
+		if (actionSelIndex==2) fileType="CSV";
+		String msg = fileType+" files for "+MODE_SELECT[modeSelIndex].replace('-', ' ').toUpperCase()+" have been "+actions[actionSelIndex]+" successfully!";
+		JOptionPane.showMessageDialog(null, HTML_TEXT_BLACK+msg, WINDOW_TITLE, JOptionPane.INFORMATION_MESSAGE);
+		System.exit(0);
 	}
 	public static void main(String[] args) 
 	{

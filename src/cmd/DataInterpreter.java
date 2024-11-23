@@ -1,5 +1,5 @@
 package cmd;
-
+//Ultimate Battle Editor v1.1 - Data Interpreter
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -29,6 +29,8 @@ public class DataInterpreter
 	public static void interpretData(int modeIndex) throws IOException
 	{
 		File[] fileArray = new File(Main.RES_PATH+Main.MODE_SELECT[modeIndex]+'/').listFiles((dir, name) -> (name.endsWith(".csv")));
+		Main.fileTotal = fileArray.length;
+		Main.bar.setMaximum(Main.fileTotal);
 		for (File f: fileArray)
 		{
 			int inputCnt=0;
@@ -63,6 +65,7 @@ public class DataInterpreter
 			FileWriter writer = new FileWriter(OUT_PATH+f.getName());
 			writer.write(output);
 			writer.close(); sc.close();
+			Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 		}
 	}
 	private static void setCsvContents(int csvIndex) throws IOException

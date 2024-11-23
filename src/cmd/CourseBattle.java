@@ -1,7 +1,6 @@
 package cmd;
-
+//Ultimate Battle Editor v1.1 - Course Battle
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -13,14 +12,14 @@ public class CourseBattle
 	static final String OPP_CFG_HEADER =
 	"chara-id,costume-num,com-diff-lvl,item-id-1,item-id-2,item-id-3,item-id-4,item-id-5,item-id-6,item-id-7,item-id-8\n";
 	static RandomAccessFile battleConfigData, oppConfigData;
-	public static void readBattleConfigFile() throws FileNotFoundException, IOException
+	public static void readBattleConfigFile() throws IOException
 	{
 		battleConfigData = new RandomAccessFile(Main.RES_PATH+Main.MODE_SELECT[4]+"/07_ub_circuit_prm.dat","r");
 		long fileSize = battleConfigData.length();
 		if (fileSize!=320) //prevent EOFException
 		{
 			battleConfigData.close(); return; 
-		}	
+		}
 		String input=Survival.BATTLE_CFG_HEADER;
 		for (int i=1; i<=8; i++) 
 		{
@@ -32,12 +31,12 @@ public class CourseBattle
 		{
 			if (i%56==0) 
 			{
-				System.out.println("Reading mission "+((i/56)+1)+"'s battle parameters...");
 				if (i!=0) 
 				{	
 					input+="\n"; //end of row
 					input = input.substring(0, input.length()-2)+"\n";
 				}
+				Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 			}
 			int val = LittleEndian.getInt(battleConfigData.readInt());
 			input+=val+",";
@@ -47,7 +46,7 @@ public class CourseBattle
 		writer.write(input); 
 		writer.close(); battleConfigData.close();
 	}
-	public static void readOpponentConfigFile() throws FileNotFoundException, IOException
+	public static void readOpponentConfigFile() throws IOException
 	{
 		oppConfigData = new RandomAccessFile(Main.RES_PATH+Main.MODE_SELECT[4]+"/08_ub_circuit_enemy_prm.dat","r");
 		long fileSize = oppConfigData.length();
@@ -68,18 +67,18 @@ public class CourseBattle
 			}
 			if (i%352==0)
 			{
-				System.out.println("Reading mission "+((i/352)+1)+"'s opponent parameters...");
 				input = input.substring(0, input.length()-1); //remove last comma
 				FileWriter writer = new FileWriter(new File(Main.RES_PATH+Main.MODE_SELECT[4]+"/circ-opp-cfg-"+((i/352)+1)+".csv"));
 				writer.write(input); writer.close();
 				input=OPP_CFG_HEADER; //reset row
+				Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 			}
 			int val = LittleEndian.getInt(oppConfigData.readInt());
 			input+=val+",";
 		}
 		oppConfigData.close();
 	}
-	public static void writeBattleConfigFile(int missionID) throws FileNotFoundException, IOException
+	public static void writeBattleConfigFile(int missionID) throws IOException
 	{
 		String root = Main.RES_PATH+Main.MODE_SELECT[4]+"/";
 		int lineCnt=0, missionAddr=(missionID-1)*56, pos;
@@ -100,10 +99,13 @@ public class CourseBattle
 			String input = sc.nextLine();
 			String[] inputArr = input.split(",");
 			lineCnt++;
-			if (!Main.isSingleMission) missionID=lineCnt; //this will assure the 2nd if condition is ALWAYS TRUE
+			if (!Main.isSingleMission) 
+			{
+				missionID=lineCnt; //this will assure the 2nd if condition is ALWAYS TRUE
+			}
+			else Main.fileTotal=1;
 			if (lineCnt==missionID)
 			{
-				System.out.println("Overwriting mission "+missionID+"'s battle parameters...");
 				for (String i: inputArr)
 				{
 					int newInt = Integer.parseInt(i);
@@ -113,11 +115,12 @@ public class CourseBattle
 					if (currInt!=newInt) battleConfigData.writeInt(LittleEndian.getInt(newInt));
 					pos+=4;
 				}
+				Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
 			}
 		}
 		sc.close();
 	}
-	public static void writeOpponentConfigFile(int missionID) throws FileNotFoundException, IOException
+	public static void writeOpponentConfigFile(int missionID) throws IOException
 	{
 		String root = Main.RES_PATH+Main.MODE_SELECT[4]+"/";
 		File folder = new File(root), selectedCSV=null;
@@ -128,6 +131,7 @@ public class CourseBattle
 		int missionAddr=0, pos;
 		if (Main.isSingleMission)
 		{
+			Main.fileTotal=1;
 			int key = Arrays.binarySearch(csvFilePaths, "circ-opp-cfg-"+missionID+".csv");
 			missionAddr=(missionID-1)*44;
 			selectedCSV = new File(root+csvFilePaths[key]);
@@ -154,9 +158,8 @@ public class CourseBattle
 			}
 			sc.nextLine(); //skip header
 
-			if (!Main.isSingleMission) System.out.println("Overwriting mission "+(i+1)+"'s opponent parameters...");
-			else System.out.println("Overwriting mission "+missionID+"'s opponent parameters...");
-			
+			Main.fileCnt++; Main.bar.setValue(Main.fileCnt);
+
 			while (sc.hasNextLine())
 			{
 				String input = sc.nextLine();
